@@ -154,7 +154,7 @@ jobs:
       - save_cache:
           key: ip-address-{{ .Branch }}-${CIRCLE_WORKFLOW_ID}
           paths:
-            - ~/project/.circleci/ansible/inventory.txt
+            - ./.circleci/ansible/inventory.txt
       - destroy-environment
   
   configure-infrastructure:
@@ -178,6 +178,7 @@ jobs:
       - run:
           name: Configure server
           command: |
+            cat ./.circleci/ansible/inventory.txt
             ansible-playbook -i ./.circleci/ansible/inventory.txt ./.circleci/ansible/configure-server.yml
       - destroy-environment   
 
