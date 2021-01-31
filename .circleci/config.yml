@@ -7,15 +7,12 @@ parameters:
 commands:
   destroy-environment:
     description: Destroy back-end and front-end cloudformation stacks given a workflow ID.
-    parameters:
-      # Add parameter here   
     steps:
       - run:
           name: Destroy environments
           when: on_fail
           command: |
-            # Your code here
-            exit 1
+            aws cloudformation delete-stack --stack-name "cicd-backend-${CIRCLE_WORKFLOW_ID}"; aws cloudformation delete-stack --stack-name "cicd-frontend-${CIRCLE_WORKFLOW_ID}"
 
   revert-migrations:
     description: Revert the last migration if successfully run in the current workflow.
@@ -35,6 +32,13 @@ commands:
             #  Add revert code here. You can find this in the Getting Started section.
               exit 1
             fi
+  
+  get_stack_ip:
+    steps:
+      - run:
+          name: create inventory file for ip
+          command: |
+            aws ec2 describe-instances --query 'Reservations[*].Instances[*].PublicIpAddress' --filters "Name=tag:aws:cloudformation:stack-name,Values=cicd-backend-${CIRCLE_WORKFLOW_ID}" --output text >> ~/project/.circleci/ansible/inventory.txt
             
 jobs:
   build-frontend:
@@ -115,6 +119,33 @@ jobs:
           command: |
             cd ./backend && npm audit --audit-level=critical
 
+  deploy-infrastructure:
+    docker:
+      - image: amazon/aws-cli
+    steps:
+      - checkout
+      - run:
+          name: Ensure back-end infrastructure exists
+          command: |
+            aws cloudformation deploy \
+              --template-file .circleci/files/backend.yml \
+              --tags project=cicdbackend \
+               --stack-name "cicd-backend-${CIRCLE_WORKFLOW_ID}" \
+               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID}"
+      - run:
+          name: Ensure front-end infrastructure exist
+          command: |
+            aws cloudformation deploy \
+              --template-file .circleci/files/frontend.yml \
+              --tags project=cicdfrontend \
+               --stack-name "cicd-frontend-${CIRCLE_WORKFLOW_ID}" \
+               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID}"
+      - get_stack_ip
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - project/.circleci/ansible/inventory.txt
+      - destroy-environment
             
 
 workflows:
@@ -130,4 +161,8 @@ workflows:
           requires: [test-frontend]
       - scan-backend:
           requires: [test-backend]
-      
+      - deploy-infrastructure:
+          requires: [scan-frontend, scan-backend]
+          filters:
+            branches:
+              only: [main]
