@@ -26,7 +26,7 @@ commands:
             SUCCESS = `curl -H "token: tairen-${CIRCLE_WORKFLOW_ID}" --request GET https://api.memstash.io/values/migration-${CIRCLE_WORKFLOW_ID}`
             if(( $SUCCESS==1 )); 
             then
-            cd ~/project/backend
+            cd ./backend
             npm install
             npm run migrations:revert
             fi
@@ -209,7 +209,7 @@ jobs:
             else
             curl -H "Content-Type: text/plain" -H "token: tairen-${CIRCLE_WORKFLOW_ID}" --request PUT --data "1" https://api.memstash.io/values/migration-${CIRCLE_WORKFLOW_ID}
             fi
-      - destroy-environment
+      #- destroy-environment
   
   deploy-frontend:
     docker:
@@ -241,7 +241,7 @@ jobs:
             tar -C dist -czvf dist.tar.gz ./backend
             aws s3 sync dist s3://udapeople-${CIRCLE_WORKFLOW_ID}
       - revert-migrations
-      - destroy-environment      
+      #- destroy-environment      
                     
   deploy-backend:
     docker:
@@ -277,7 +277,7 @@ jobs:
              cp -p backend.tar.gz ./backend/backend.tar.gz
              ansible-playbook ./.circleci/ansible/deploy-backend.yml -i ./.circleci/ansible/inventory.txt
       - revert-migrations
-      - destroy-environment   
+      #- destroy-environment   
 
 
 workflows:
