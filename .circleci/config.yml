@@ -38,7 +38,14 @@ commands:
       - run:
           name: create inventory file for ip
           command: |
-            aws ec2 describe-instances --query 'Reservations[*].Instances[*].PublicIpAddress' --filters "Name=tag:aws:cloudformation:stack-name,Values=cicd-backend-${CIRCLE_WORKFLOW_ID}" --output text >> ~/project/.circleci/ansible/inventory.txt
+            aws ec2 describe-instances --query 'Reservations[*].Instances[*].PublicIpAddress' --filters "Name=tag:aws:cloudformation:stack-name,Values=cicd-backend-${CIRCLE_WORKFLOW_ID}" --output text >> ./.circleci/ansible/inventory.txt
+
+  get-backend-stack-url:
+    steps:
+      - run:
+          name: getting backend url 
+          command: |
+            aws ec2 describe-instances --filters "Name=tag:aws:cloudformation:stack-name,Values=cicd-backend-${CIRCLE_WORKFLOW_ID}" --query 'Reservations[*].Instances[*].PublicDnsName' --output text >> ~/back-end-url
             
 jobs:
   build-frontend:
@@ -132,6 +139,11 @@ jobs:
               --tags project=cicdbackend \
                --stack-name "cicd-backend-${CIRCLE_WORKFLOW_ID}" \
                --parameter-overrides ID="${CIRCLE_WORKFLOW_ID}"
+      - get-backend-stack-url
+      - save_cache:
+          paths:
+            - "~/back-end-url"
+          key: back-end-url-${CIRCLE_WORKFLOW_ID}
       - run:
           name: Ensure front-end infrastructure exist
           command: |
@@ -144,9 +156,31 @@ jobs:
       - persist_to_workspace:
           root: ~/
           paths:
-            - project/.circleci/ansible/inventory.txt
+            - ./.circleci/ansible/inventory.txt
       - destroy-environment
-            
+  
+  configure-infrastructure:
+    docker:
+      - image: python:3.7-alpine3.11
+    steps:
+      - checkout
+      - add_ssh_keys:
+          fingerprints: ["cb:02:c3:37:a9:4b:ae:3b:6e:78:f5:81:96:46:d6:94"]
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Install dependencies
+          command: |
+            apk add --update ansible 
+      - run:
+          name: Disable Host Key Checking
+          command: |
+            export ANSIBLE_HOST_KEY_CHECKING=False
+      - run:
+          name: Configure server
+          command: |
+            ansible-playbook -i ./.circleci/ansible/inventory.txt ./ansible/configure-server.yml
+      - destroy-environment    
 
 workflows:
   default:
@@ -166,3 +200,5 @@ workflows:
           filters:
             branches:
               only: [main]
+      - configure-infrastructure:
+          requires: [deploy-infrastructure]
