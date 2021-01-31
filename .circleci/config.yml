@@ -12,25 +12,23 @@ commands:
           name: Destroy environments
           when: on_fail
           command: |
-            aws cloudformation delete-stack --stack-name "cicd-backend-${CIRCLE_WORKFLOW_ID}"; aws cloudformation delete-stack --stack-name "cicd-frontend-${CIRCLE_WORKFLOW_ID}"
+            aws s3 rb s3://udapeople-${CIRCLE_WORKFLOW_ID} --force
+            aws cloudformation delete-stack --stack-name "cicd-backend-${CIRCLE_WORKFLOW_ID}"
+            aws cloudformation delete-stack --stack-name "cicd-frontend-${CIRCLE_WORKFLOW_ID}"
 
   revert-migrations:
-    description: Revert the last migration if successfully run in the current workflow.
-    parameters:
-      # Add parameter here     
+    description: Revert the last migration if successfully run in the current workflow.     
     steps:
       - run:
           name: Revert migrations
-          # Add when this will run
+          when: on_fail
           command: |
-            # Curl command here to see if there was a successful migration associated with the workflow id, store result in SUCCESS variable
-            SUCCESS = 1
+            SUCCESS = `curl -H "token: tairen-${CIRCLE_WORKFLOW_ID}" --request GET https://api.memstash.io/values/migration-${CIRCLE_WORKFLOW_ID}`
             if(( $SUCCESS==1 )); 
             then
-            #  cd ~/project/backend
-            #  npm install
-            #  Add revert code here. You can find this in the Getting Started section.
-              exit 1
+            cd ~/project/backend
+            npm install
+            npm run migrations:revert
             fi
   
   get_stack_ip:
@@ -153,10 +151,10 @@ jobs:
                --stack-name "cicd-frontend-${CIRCLE_WORKFLOW_ID}" \
                --parameter-overrides ID="${CIRCLE_WORKFLOW_ID}"
       - get_stack_ip
-      - persist_to_workspace:
-          root: ~/
+      - save_cache:
+          key: ip-address-{{ .Branch }}-${CIRCLE_WORKFLOW_ID}
           paths:
-            - ./.circleci/ansible/inventory.txt
+            - ~/project/.circleci/ansible/inventory.txt
       - destroy-environment
   
   configure-infrastructure:
@@ -166,8 +164,8 @@ jobs:
       - checkout
       - add_ssh_keys:
           fingerprints: ["cb:02:c3:37:a9:4b:ae:3b:6e:78:f5:81:96:46:d6:94"]
-      - attach_workspace:
-          at: ~/
+      - restore_cache:
+          key: ip-address-{{ .Branch }}-${CIRCLE_WORKFLOW_ID}
       - run:
           name: Install dependencies
           command: |
@@ -179,8 +177,94 @@ jobs:
       - run:
           name: Configure server
           command: |
-            ansible-playbook -i ./.circleci/ansible/inventory.txt ./ansible/configure-server.yml
-      - destroy-environment    
+            ansible-playbook -i ~/project/.circleci/ansible/inventory.txt ~/project/ansible/configure-server.yml
+      - destroy-environment   
+
+  run-migrations:
+    docker:
+      - image: circleci/node:latest
+    steps:
+      - checkout
+      - run:
+          name: Run migrations
+          command: |
+            cd ./backend
+            npm i
+            npm run migrations >> migrations.txt
+            status=$(cat migrations.txt | grep -i "has ben executed successfully")
+            if [-z $status ]
+            then
+            curl -H "Content-Type: text/plain" -H "token: tairen-${CIRCLE_WORKFLOW_ID}" --request PUT --data "0" https://api.memstash.io/values/migration-${CIRCLE_WORKFLOW_ID}
+            else
+            curl -H "Content-Type: text/plain" -H "token: tairen-${CIRCLE_WORKFLOW_ID}" --request PUT --data "1" https://api.memstash.io/values/migration-${CIRCLE_WORKFLOW_ID}
+            fi
+      - destroy-environment
+  
+  deploy-frontend:
+    docker:
+      - image: amazon/aws-cli
+    steps:
+      - checkout
+      - run:
+          name: installing tar
+          command: |
+            yum -y install tar gzip
+      - restore_cache:
+          keys: ["back-end-url-${CIRCLE_WORKFLOW_ID}"]
+      - run:
+          name: Install dependencies
+          command: |
+            yum -y install nodejs
+      - run:
+          name: Get backend url
+          command: |
+            BACKEND_IP=`cat ~/back-end-url`
+            export API_URL="http://${BACKEND_IP}:3030"
+            echo "${API_URL}"
+      - run:
+          name: Deploy frontend objects
+          command: |
+            cd ./backend
+            npm i
+            npm run build
+            tar -C dist -czvf dist.tar.gz ./backend
+            aws s3 sync dist s3://udapeople-${CIRCLE_WORKFLOW_ID}
+      - revert-migrations
+      - destroy-environment      
+                    
+  deploy-backend:
+    docker:
+      - image: python:3.7-alpine3.11
+    steps:
+      - checkout
+      - add_ssh_keys:
+          fingerprints: ["cb:02:c3:37:a9:4b:ae:3b:6e:78:f5:81:96:46:d6:94"]
+      - restore_cache:
+          key: ip-address-{{ .Branch }}-${CIRCLE_WORKFLOW_ID}
+      - run:
+          name: Install dependencies
+          command: |
+            apk add --update ansible
+      - run:
+          name: Deploy backend
+          command: |
+            echo ENVIRONMENT=production >> "backend/.env"
+            echo TYPEORM_CONNECTION=postgres >> "backend/.env"
+            echo TYPEORM_MIGRATIONS_DIR=./src/migrations >> "backend/.env"
+            echo TYPEORM_ENTITIES=./src/modules/domain/**/*.entity.ts >> "backend/.env"
+            echo TYPEORM_MIGRATIONS=./src/migrations/*.ts >> "backend/.env"
+            echo TYPEORM_HOST=$TYPEORM_HOST >> "backend/.env"
+            echo TYPEORM_PORT=$TYPEORM_PORT >> "backend/.env"
+            echo TYPEORM_USERNAME=$TYPEORM_USERNAME >> "backend/.env"
+            echo TYPEORM_PASSWORD=$TYPEORM_PASSWORD >> "backend/.env"
+            echo TYPEORM_DATABASE=$TYPEORM_DATABASE >> "backend/.env"
+
+             tar -C backend -czvf backend.tar.gz .
+             cp -p backend.tar.gz ~/project/backend/backend.tar.gz
+             ansible-playbook ~/project/.circleci/ansible/deploy-backend.yml -i ~/project/.circleci/ansible/inventory.txt
+      - revert-migrations
+      - destroy-environment   
+
 
 workflows:
   default:
@@ -202,3 +286,9 @@ workflows:
               only: [main]
       - configure-infrastructure:
           requires: [deploy-infrastructure]
+      - run-migrations:
+          requires: [configure-infrastructure]
+      - deploy-frontend:
+          requires: [run-migrations]
+      - deploy-backend:
+          requires: [run-migrations]
