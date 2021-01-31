@@ -190,7 +190,11 @@ jobs:
       - run:
           name: Run migrations
           command: |
-            pip install awscli
+            sudo apt-get update
+            sudo apt-get install python3
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
             cd ./backend
             npm i
             npm run migrations >> migrations.txt
@@ -248,7 +252,9 @@ jobs:
           name: Install dependencies
           command: |
             apk add --update ansible
-            pip install awscli
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
       - run:
           name: Deploy backend
           command: |
