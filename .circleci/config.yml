@@ -1,4 +1,8 @@
 version: 2.1
+parameters:
+  version-cache:
+    type: String
+    default: "v2"
 
 commands:
   destroy-environment:
@@ -39,14 +43,14 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          keys: [frontend-build-v2]
+          keys: ["frontend-build-<< pipeline.parameters.version-cache >>"]
       - run:
           name: Build front-end
           command: |
             cd ./frontend && npm i && npm run build
       - save_cache:
           paths: [frontend/node_modules]
-          key: frontend-build-v2
+          key: frontend-build-<< pipeline.parameters.version-cache >>
 
   build-backend:
     docker:
@@ -54,14 +58,14 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          keys: [backend-build-v2]
+          keys: [backend-build-<< pipeline.parameters.version-cache >>]
       - run:
           name: Back-end build
           command: |
             cd ./backend && npm i && npm run build
       - save_cache:
           paths: [backend/node_modules]
-          key: backend-build-v2
+          key: backend-build-<< pipeline.parameters.version-cache >>
   
   test-frontend:
     docker:
@@ -69,7 +73,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          keys: [frontend-build-v2]
+          keys: [frontend-build-<< pipeline.parameters.version-cache >>]
       - run:
           name: Front-end unit testing
           command: |
@@ -81,7 +85,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          keys: [backend-build-v2]
+          keys: [backend-build-<< pipeline.parameters.version-cache >>]
       - run:
           name: Back-end unit testing
           command: |
@@ -93,7 +97,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          keys: [frontend-build-v2]
+          keys: [frontend-build-<< pipeline.parameters.version-cache >>]
       - run:
           name: Front-end vulnerability scan
           command: |
@@ -105,7 +109,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          keys: [backend-build-v2]
+          keys: [backend-build-<< pipeline.parameters.version-cache >>]
       - run:
           name: Back-end vulnerability scan
           command: |
