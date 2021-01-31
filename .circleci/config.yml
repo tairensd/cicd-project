@@ -141,18 +141,18 @@ jobs:
       - save_cache:
           paths:
             - "~/back-end-url"
-          key: back-end-url-${CIRCLE_WORKFLOW_ID}
+          key: back-end-url-{{ .Revision }}
       - run:
           name: Ensure front-end infrastructure exist
           command: |
             aws cloudformation deploy \
               --template-file .circleci/files/frontend.yml \
               --tags project=cicdfrontend \
-               --stack-name "cicd-frontend-${CIRCLE_WORKFLOW_ID}" \
-               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID}"
+              --stack-name "cicd-frontend-${CIRCLE_WORKFLOW_ID}" \
+              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID}"
       - get_stack_ip
       - save_cache:
-          key: ip-address-{{ .Branch }}-${CIRCLE_WORKFLOW_ID}
+          key: ip-address-{{ .Branch }}-{{ .Revision }}
           paths:
             - ./.circleci/ansible/inventory.txt
       - destroy-environment
@@ -165,7 +165,7 @@ jobs:
       - add_ssh_keys:
           fingerprints: ["cb:02:c3:37:a9:4b:ae:3b:6e:78:f5:81:96:46:d6:94"]
       - restore_cache:
-          key: ip-address-{{ .Branch }}-${CIRCLE_WORKFLOW_ID}
+          key: ip-address-{{ .Branch }}-{{ .Revision }}
       - run:
           name: Install dependencies
           command: |
@@ -213,7 +213,7 @@ jobs:
           command: |
             yum -y install tar gzip
       - restore_cache:
-          keys: ["back-end-url-${CIRCLE_WORKFLOW_ID}"]
+          keys: ["back-end-url-{{ .Revision }}"]
       - run:
           name: Install dependencies
           command: |
@@ -243,7 +243,7 @@ jobs:
       - add_ssh_keys:
           fingerprints: ["cb:02:c3:37:a9:4b:ae:3b:6e:78:f5:81:96:46:d6:94"]
       - restore_cache:
-          key: ip-address-{{ .Branch }}-${CIRCLE_WORKFLOW_ID}
+          key: ip-address-{{ .Branch }}-{{ .Revision }}
       - run:
           name: Install dependencies
           command: |
