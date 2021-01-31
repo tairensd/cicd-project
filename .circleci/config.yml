@@ -1,7 +1,7 @@
 version: 2.1
 parameters:
   version-cache:
-    type: String
+    type: string
     default: "v2"
 
 commands:
