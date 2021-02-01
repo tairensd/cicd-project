@@ -188,8 +188,11 @@ jobs:
       - run:
           name: update and install python and ansible
           command: |
-            sudo apt-get update
-            sudo apt-get install python3 ansible
+            sudo apt update
+            sudo apt install python3 -y
+            sudo apt install software-properties-common
+            sudo apt-add-repository --yes --update ppa:ansible/ansible
+            sudo apt install ansible -y
       - run:
           name: install awscli
           command: |
@@ -212,6 +215,7 @@ jobs:
           command: |
             export ANSIBLE_HOST_KEY_CHECKING=False
             cat ./.circleci/ansible/inventory
+            ansible-playbook --version
             ansible-playbook -i ./.circleci/ansible/inventory ./.circleci/ansible/configure-server.yml
       - destroy-environment   
 
