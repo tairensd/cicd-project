@@ -327,7 +327,6 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            yum -y install nodejs
             yum -y install tar gzip
       - run:
           name: Update cloudfront distribution
@@ -353,8 +352,6 @@ jobs:
               aws cloudformation delete-stack --stack-name "cicd-backend-${OldWorkflowID}}"
               aws cloudformation delete-stack --stack-name "cicd-frontend-${OldWorkflowID}"
             fi
-      - destroy-environment
-      - revert-migrations 
 
 workflows:
   default:
