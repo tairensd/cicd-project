@@ -189,7 +189,15 @@ jobs:
           name: update and install python and ansible
           command: |
             sudo apt-get update
+            echo "1"
             sudo apt-get install -u python3 -y
+            echo "2"
+            deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main
+            echo "3"
+            sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
+            echo "4"
+            sudo apt update
+            echo "5"
             sudo apt-get install -u ansible -y
       - run:
           name: install awscli
