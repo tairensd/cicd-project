@@ -208,12 +208,9 @@ jobs:
       - restore_cache:
           key: ip-address-{{ .Branch }}-{{ .Revision }}
       - run:
-          name: Disable Host Key Checking
-          command: |
-            export ANSIBLE_HOST_KEY_CHECKING=False
-      - run:
           name: Configure server
           command: |
+            export ANSIBLE_HOST_KEY_CHECKING=False
             cat ./.circleci/ansible/inventory
             ansible-playbook -i ./.circleci/ansible/inventory ./.circleci/ansible/configure-server.yml
       - destroy-environment   
@@ -338,9 +335,10 @@ jobs:
             echo TYPEORM_PASSWORD=$TYPEORM_PASSWORD >> "backend/.env"
             echo TYPEORM_DATABASE=$TYPEORM_DATABASE >> "backend/.env"
 
-             tar -C backend -czvf backend.tar.gz .
-             cp -p backend.tar.gz ./backend/backend.tar.gz
-             ansible-playbook ./.circleci/ansible/deploy-backend.yml -i ./.circleci/ansible/inventory
+            export ANSIBLE_HOST_KEY_CHECKING=False
+            tar -C backend -czvf backend.tar.gz .
+            cp -p backend.tar.gz ./backend/backend.tar.gz
+            ansible-playbook ./.circleci/ansible/deploy-backend.yml -i ./.circleci/ansible/inventory
       - revert-migrations
       - destroy-environment  
       
