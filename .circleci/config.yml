@@ -174,6 +174,7 @@ jobs:
           command: |
             aws ec2 describe-instances --query 'Reservations[*].Instances[*].PublicIpAddress' --filters "Name=tag:aws:cloudformation:stack-name,Values=cicd-backend-${CIRCLE_WORKFLOW_ID}" --output text >> ./.circleci/ansible/inventory
             cat ./.circleci/ansible/inventory
+            sleep 120
       - save_cache:
           key: ip-address-{{ .Branch }}-{{ .Revision }}
           paths:
@@ -192,7 +193,6 @@ jobs:
             echo "1"
             sudo apt-get install -u python3 -y
             echo "2"
-            deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main
             echo "3"
             sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
             echo "4"
