@@ -313,7 +313,7 @@ jobs:
       - run:
           name: Backend smoke test.
           command: |
-            BACKEND_IP=$(aws ec2 describe-instances --query 'Reservations[*].Instances[*].PublicDnsNam' --filters "Name=tag:aws:cloudformation:stack-name,Values=cicd-backend-${CIRCLE_WORKFLOW_ID}" --output text)
+            BACKEND_IP=$(aws ec2 describe-instances --query 'Reservations[*].Instances[*].PublicDnsName' --filters "Name=tag:aws:cloudformation:stack-name,Values=cicd-backend-${CIRCLE_WORKFLOW_ID}" --output text)
             curl "http://${BACKEND_IP}:3030/api/status"
       - revert-migrations
       - destroy-environment
