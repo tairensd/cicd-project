@@ -2,7 +2,7 @@ version: 2.1
 parameters:
   version-cache:
     type: string
-    default: "v3"
+    default: "v4"
 
 commands:
   destroy-environment:
@@ -23,8 +23,8 @@ commands:
           name: Revert migrations
           when: on_fail
           command: |
-            SUCCESS = `curl -H "token: tairen-${CIRCLE_WORKFLOW_ID}" --request GET https://api.memstash.io/values/migration-${CIRCLE_WORKFLOW_ID}`
-            if(( $SUCCESS==1 )); 
+            success=`curl -H "token: tairen-${CIRCLE_WORKFLOW_ID}" --request GET https://api.memstash.io/values/migration-${CIRCLE_WORKFLOW_ID}`
+            if(( $success==1 )); 
             then
             cd ./backend
             npm install
@@ -36,14 +36,15 @@ commands:
       - run:
           name: create inventory file for ip
           command: |
-            aws ec2 describe-instances --query 'Reservations[*].Instances[*].PublicIpAddress' --filters "Name=tag:aws:cloudformation:stack-name,Values=cicd-backend-${CIRCLE_WORKFLOW_ID}" --output text >> ./.circleci/ansible/inventory.txt
+            aws ec2 describe-instances --query 'Reservations[*].Instances[*].PublicIpAddress' --filters "Name=tag:aws:cloudformation:stack-name,Values=cicd-backend-${CIRCLE_WORKFLOW_ID}" --output text >> ./.circleci/ansible/inventory
+            cat ./.circleci/ansible/inventory
 
   get-backend-stack-url:
     steps:
       - run:
           name: getting backend url 
           command: |
-            aws ec2 describe-instances --filters "Name=tag:aws:cloudformation:stack-name,Values=cicd-backend-${CIRCLE_WORKFLOW_ID}" --query 'Reservations[*].Instances[*].PublicDnsName' --output text >> ~/back-end-url
+            aws ec2 describe-instances --filters "Name=tag:aws:cloudformation:stack-name,Values=cicd-backend-${CIRCLE_WORKFLOW_ID}" --query 'Reservations[*].Instances[*].PublicDnsName' --output text >> ./back-end-url
             
 jobs:
   build-frontend:
@@ -126,9 +127,27 @@ jobs:
 
   deploy-infrastructure:
     docker:
-      - image: amazon/aws-cli
+      - image: circleci/node:13.8.0
     steps:
       - checkout
+      - run:
+          name: update and install python
+          command: |
+            sudo apt-get update
+            sudo apt-get install python3
+      - run:
+          name: install awscli
+          command: |
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            echo "unzip complete"
+            sudo ./aws/install
+            echo "aws install complete"
+      - run:
+          name: install less
+          command: |
+            sudo apt-get install less
+            echo "less install complete"
       - run:
           name: Ensure back-end infrastructure exists
           command: |
@@ -140,7 +159,7 @@ jobs:
       - get-backend-stack-url
       - save_cache:
           paths:
-            - "~/back-end-url"
+            - "./back-end-url"
           key: back-end-url-{{ .Revision }}
       - run:
           name: Ensure front-end infrastructure exist
@@ -150,27 +169,44 @@ jobs:
               --tags project=cicdfrontend \
               --stack-name "cicd-frontend-${CIRCLE_WORKFLOW_ID}" \
               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID}"
-      - get_stack_ip
+      - run:
+          name: create inventory file for ip
+          command: |
+            aws ec2 describe-instances --query 'Reservations[*].Instances[*].PublicIpAddress' --filters "Name=tag:aws:cloudformation:stack-name,Values=cicd-backend-${CIRCLE_WORKFLOW_ID}" --output text >> ./.circleci/ansible/inventory
+            cat ./.circleci/ansible/inventory
       - save_cache:
           key: ip-address-{{ .Branch }}-{{ .Revision }}
           paths:
-            - ./.circleci/ansible/inventory.txt
+            - ./.circleci/ansible/inventory
       - destroy-environment
   
   configure-infrastructure:
     docker:
-      - image: python:3.7-alpine3.11
+      - image: circleci/node:13.8.0
     steps:
       - checkout
+      - run:
+          name: update and install python and ansible
+          command: |
+            sudo apt-get update
+            sudo apt-get install python3 ansible
+      - run:
+          name: install awscli
+          command: |
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            echo "unzip complete"
+            sudo ./aws/install
+            echo "aws install complete"
+      - run:
+          name: install less
+          command: |
+            sudo apt-get install less
+            echo "less install complete"
       - add_ssh_keys:
           fingerprints: ["cb:02:c3:37:a9:4b:ae:3b:6e:78:f5:81:96:46:d6:94"]
       - restore_cache:
           key: ip-address-{{ .Branch }}-{{ .Revision }}
-      - run:
-          name: Install dependencies
-          command: |
-            apk add --update ansible 
-            pip install awscli
       - run:
           name: Disable Host Key Checking
           command: |
@@ -178,8 +214,8 @@ jobs:
       - run:
           name: Configure server
           command: |
-            cat ./.circleci/ansible/inventory.txt
-            ansible-playbook -i ./.circleci/ansible/inventory.txt ./.circleci/ansible/configure-server.yml
+            cat ./.circleci/ansible/inventory
+            ansible-playbook -i ./.circleci/ansible/inventory ./.circleci/ansible/configure-server.yml
       - destroy-environment   
 
   run-migrations:
@@ -187,61 +223,83 @@ jobs:
       - image: circleci/node:13.8.0
     steps:
       - checkout
+      - restore_cache:
+          keys: [backend-build-<< pipeline.parameters.version-cache >>]
       - run:
-          name: Run migrations
+          name: update and install python
           command: |
             sudo apt-get update
             sudo apt-get install python3
+      - run:
+          name: install awscli
+          command: |
             curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
             unzip awscliv2.zip
             echo "unzip complete"
             sudo ./aws/install
             echo "aws install complete"
+      - run:
+          name: install less
+          command: |
             sudo apt-get install less
             echo "less install complete"
+      - run:
+          name: run npm i and migration
+          no_output_timeout: 15m
+          command: |
             cd ./backend
-            npm install
-            npm run migrations >> migrations.txt
+            npm i
+            npm run migrations 2>&1 | tee migrations.txt
             status=$(cat migrations.txt | grep -i "has been executed successfully")
-            if [-z $status ]
+      - run:
+          name: check migration status and put into memstash 
+          command: |
+            if [ $status ]
             then
             curl -H "Content-Type: text/plain" -H "token: tairen-${CIRCLE_WORKFLOW_ID}" --request PUT --data "0" https://api.memstash.io/values/migration-${CIRCLE_WORKFLOW_ID}
             else
             curl -H "Content-Type: text/plain" -H "token: tairen-${CIRCLE_WORKFLOW_ID}" --request PUT --data "1" https://api.memstash.io/values/migration-${CIRCLE_WORKFLOW_ID}
             fi
-      #- destroy-environment
+      - revert-migrations
+      - destroy-environment
   
   deploy-frontend:
     docker:
-      - image: amazon/aws-cli
+      - image: circleci/node:13.8.0
     steps:
       - checkout
       - run:
           name: installing tar
           command: |
-            yum -y install tar gzip
+            sudo apt-get install tar gzip
       - restore_cache:
-          keys: ["back-end-url-{{ .Revision }}"]
+          key: "back-end-url-{{ .Revision }}"
       - run:
-          name: Install dependencies
+          name: Install aws cli
           command: |
-            yum -y install nodejs
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            echo "unzip complete"
+            sudo ./aws/install
+            echo "aws install complete"
       - run:
-          name: Get backend url
+          name: install less
           command: |
-            BACKEND_IP=`cat ~/back-end-url`
+            sudo apt-get install less
+            echo "less install complete"
+      - run:
+          name: Get backend url and deploy frontend
+          command: |
+            BACKEND_IP=`cat ./back-end-url`
             export API_URL="http://${BACKEND_IP}:3030"
             echo "${API_URL}"
-      - run:
-          name: Deploy frontend objects
-          command: |
-            cd ./backend
+            cd ~/project/frontend
             npm i
             npm run build
-            tar -C dist -czvf dist.tar.gz ./backend
-            aws s3 sync dist s3://udapeople-${CIRCLE_WORKFLOW_ID}
+            tar -C dist -czvf dist.tar.gz .
+            aws s3 sync dist "s3://udapeople-${CIRCLE_WORKFLOW_ID}"
       - revert-migrations
-      #- destroy-environment      
+      - destroy-environment      
                     
   deploy-backend:
     docker:
@@ -255,10 +313,17 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            apk add --update ansible
+            apk add --update ansible curl
+      - run:
+          name: Install aws cli
+          command: |
             curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
             unzip awscliv2.zip
-            sudo ./aws/install
+            ./aws/install
+      - run:
+          name: Install less
+          command: |
+            apk add --update less 
       - run:
           name: Deploy backend
           command: |
@@ -275,9 +340,62 @@ jobs:
 
              tar -C backend -czvf backend.tar.gz .
              cp -p backend.tar.gz ./backend/backend.tar.gz
-             ansible-playbook ./.circleci/ansible/deploy-backend.yml -i ./.circleci/ansible/inventory.txt
+             ansible-playbook ./.circleci/ansible/deploy-backend.yml -i ./.circleci/ansible/inventory
       - revert-migrations
-      #- destroy-environment   
+      - destroy-environment  
+      
+  smoke-test:
+    docker:
+      - image: circleci/node:13.8.0
+    steps:
+      - checkout
+      - run:
+          name: update and install python
+          command: |
+            sudo apt-get update
+            sudo apt-get install python3 curl
+      - restore_cache:
+          key: "back-end-url-{{ .Revision }}"
+      - run:
+          name: install awscli
+          command: |
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            echo "unzip complete"
+            sudo ./aws/install
+            echo "aws install complete"
+      - run:
+          name: install less
+          command: |
+            sudo apt-get install less
+            echo "less install complete"
+      - run:
+          name: Backend smoke test.
+          command: |
+            BACKEND_IP=`cat ./back-end-url`
+            export API_URL="http://${BACKEND_IP}:3030"
+            echo "${API_URL}"
+            if curl -s "${API_URL}/api/status" | grep "ok"
+            then
+            echo "Success"
+            exit 0
+            else
+            echo "Not Found"
+            exit 1
+            fi
+      - run:
+          name: Frontend smoke test.
+          command: |
+            URL="http://udapeople-${CIRCLE_WORKFLOW_ID}.s3-website-eu-west-2.amazonaws.com"
+            echo ${URL}
+            if curl -s ${URL} | grep "Welcome"
+            then
+            exit 0
+            else
+            exit 1
+            fi
+      - revert-migrations
+      - destroy-environment
 
 
 workflows:
@@ -306,3 +424,5 @@ workflows:
           requires: [run-migrations]
       - deploy-backend:
           requires: [run-migrations]
+      - smoke-test:
+          requires: [deploy-backend, deploy-frontend]
