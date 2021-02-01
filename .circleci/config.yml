@@ -340,11 +340,10 @@ jobs:
             
             echo "old workflow id: ${OldWorkflowID}"
 
-            aws cloudformation deploy \
-              --template-file .circleci/files/cloudfront.yml \
-              --stack-name cicd-cloudfront \
-              --parameter-overrides WorkflowID="${CIRCLE_WORKFLOW_ID}" \
-              --tags project=udapeople
+            aws cloudformation update-stack \
+            --use-previous-template \
+            --stack-name cloudfront-stack \
+            --parameters ParameterKey=WorkflowID,ParameterValue=$CIRCLE_WORKFLOW_ID,UsePreviousValue=false
             
             if [[ "${STACKS[0]}" =~ "${OldWorkflowID}" ]]
             then
@@ -352,6 +351,11 @@ jobs:
               aws cloudformation delete-stack --stack-name "cicd-backend-${OldWorkflowID}}"
               aws cloudformation delete-stack --stack-name "cicd-frontend-${OldWorkflowID}"
             fi
+#            aws cloudformation deploy \
+#              --template-file .circleci/files/cloudfront.yml \
+#              --stack-name cicd-cloudfront \
+#              --parameter-overrides WorkflowID="${CIRCLE_WORKFLOW_ID}" \
+#              --tags project=udapeople
 
 workflows:
   default:
