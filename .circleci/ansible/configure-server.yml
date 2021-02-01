@@ -21,6 +21,7 @@
 
   environment:
     - ENVIRONMENT: production
+    - NODE_ENV: production
     - TYPEORM_CONNECTION: postgres
     - TYPEORM_ENTITIES: ./src/modules/domain/**/*.entity.ts
     - TYPEORM_HOST: cicd-db.cliboidxgozj.eu-west-2.rds.amazonaws.com
