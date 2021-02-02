@@ -345,7 +345,7 @@ jobs:
             --stack-name uda-people-cloudfront \
             --parameters ParameterKey=WorkflowID,ParameterValue=${CIRCLE_WORKFLOW_ID:0:7},UsePreviousValue=false
             
-            if [[ "${STACKS[]}" =~ "${OldWorkflowID:0:7}" ]]
+            if [[ "${STACKS[@]}" =~ "${OldWorkflowID:0:7}" ]]
             then
               aws s3 rb s3://udapeople-${OldWorkflowID:0:7} --force
               aws cloudformation delete-stack --stack-name "cicd-backend-${OldWorkflowID:0:7}"
