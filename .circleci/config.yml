@@ -351,6 +351,9 @@ jobs:
               aws cloudformation delete-stack --stack-name "cicd-backend-${OldWorkflowID:0:7}"
               aws cloudformation delete-stack --stack-name "cicd-frontend-${OldWorkflowID:0:7}"
             fi
+          no_output_timeout: 30m
+
+
 #            aws cloudformation deploy \
 #              --template-file .circleci/files/cloudfront.yml \
 #              --stack-name cicd-cloudfront \
