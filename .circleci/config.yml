@@ -348,8 +348,12 @@ jobs:
             if [[ "${STACKS[@]}" =~ "${OldWorkflowID:0:7}" ]]
             then
               aws s3 rb s3://udapeople-${OldWorkflowID:0:7} --force
+
               aws cloudformation delete-stack --stack-name "cicd-backend-${OldWorkflowID:0:7}"
+
               aws cloudformation delete-stack --stack-name "cicd-frontend-${OldWorkflowID:0:7}"
+
+              echo "complete"
             fi
           no_output_timeout: 30m
 
