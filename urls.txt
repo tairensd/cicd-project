@@ -6,8 +6,7 @@ URL 2:
 http://udapeople-bebbf4c.s3-website.eu-west-2.amazonaws.com
 
 URL 3:
-udapeople-bebbf4c.s3.amazonaws.com
-udapeople-bebbf4c.s3.amazonaws.com/index.html
+dnsrquqpaqwuj.cloudfront.net
 
 URL 4:
 http://ec2-3-8-146-11.eu-west-2.compute.amazonaws.com:3030/api/status
