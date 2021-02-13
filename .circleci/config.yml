@@ -353,6 +353,7 @@ jobs:
 
               aws cloudformation delete-stack --stack-name "cicd-frontend-${OldWorkflowID:0:7}"
 
+              echo -ne '\n'
               echo "complete"
             fi
           no_output_timeout: 30m
