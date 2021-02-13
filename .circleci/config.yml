@@ -356,9 +356,9 @@ jobs:
 
             if [ "${OldWorkflowID}" != "${CIRCLE_WORKFLOW_ID:0:7}" ]
             then 
-              aws s3 rb s3://udapeople-${OldWorkflowID} --recursive
-              aws cloudformation delete-stack --stack-name "udapeople-backend-${OldWorkflowID}"
-              aws cloudformation delete-stack --stack-name "udapeople-frontend-${OldWorkflowID}"
+              aws s3 rb s3://udapeople-${OldWorkflowID} --force
+              aws cloudformation delete-stack --stack-name "cicd-backend-${OldWorkflowID}"
+              aws cloudformation delete-stack --stack-name "cicd-frontend-${OldWorkflowID}"
             else
               echo "no destroy"
             fi
