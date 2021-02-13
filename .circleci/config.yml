@@ -331,11 +331,22 @@ jobs:
       - run:
           name: Update cloudfront distribution
           command: |
+            export OldWorkflowID=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='WorkflowID'].Value" \
+            --no-paginate --output text)
+            
+            echo $OldWorkflowID > oldworkflowid.txt
+            cat oldworkflowid.txt
+
             aws cloudformation deploy \
               --template-file .circleci/files/cloudfront.yml \
               --stack-name uda-people-cloudfront \
               --parameter-overrides WorkflowID="${CIRCLE_WORKFLOW_ID:0:7}" \
               --tags project=udapeople
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - project/oldworkflowid.txt
       - destroy-environment
       - revert-migrations 
 
@@ -344,17 +355,23 @@ jobs:
       - image: amazon/aws-cli
     steps:
       - checkout
+      - run: yum -y install tar gzip
+      - attach_workspace:
+          at: ~/ 
       - run:
           name: old stack workflow id / remove old stack and files
           command: |
-            export OldWorkflowID=$(aws cloudformation \
-            list-exports --query "Exports[?Name==\`WorkflowID\`].Value" \
-            --no-paginate --output text)
-
+            export OldWorkflowID=`cat oldworkflowid.txt`
+            
             echo Old Workflow Id: "${OldWorkflowID}"
             echo Current Workflow Id: "${CIRCLE_WORKFLOW_ID:0:7}"
 
-            if [ "${OldWorkflowID}" != "${CIRCLE_WORKFLOW_ID:0:7}" ]
+            export STACKS=$(aws cloudformation list-stacks \
+            --query "StackSummaries[*].StackName" \
+            --stack-status-filter CREATE_COMPLETE \
+            --no-paginate --output text) 
+
+            if [[ "${STACKS[@]}" =~ "${OldWorkflowID}" ]]
             then 
               aws s3 rb s3://udapeople-${OldWorkflowID} --force
               aws cloudformation delete-stack --stack-name "cicd-backend-${OldWorkflowID}"
